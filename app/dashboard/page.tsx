@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+import GraphiqueEtats from "../components/GraphiqueEtats";
 
 type Projet = { id: string; nom: string; type: string; etat: string; updated_at: string };
 type Formulaire = { id?: string; nom: string; type: string; etat: string };
@@ -159,6 +160,7 @@ export default function Dashboard() {
               ))}
             </tbody>
           </table>
+          <GraphiqueEtats projets={projets} />
           {projets.length === 0 && (
             <p className="py-6 text-center text-slate-500">Aucun projet. Cliquez sur « Nouveau projet » pour commencer.</p>
           )}
