@@ -15,12 +15,21 @@ const couleurs: Record<string, string> = {
   "En étude": "bg-purple-100 text-purple-700",
   Terminé: "bg-green-100 text-green-700",
 };
+const couleursTypes: Record<string, string> = {
+  Bâtiment: "bg-blue-500",
+  Route: "bg-purple-400",
+  Pont: "bg-red-400",
+  Hydraulique: "bg-orange-400",
+  Autre: "bg-blue-600",
+};
 const menu = ["Dashboard", "Projets", "Analyses", "Données", "Rapports", "Documents"];
 
 export default function Dashboard() {
   const router = useRouter();
   const [nom, setNom] = useState("");
   const [projets, setProjets] = useState<Projet[]>([]);
+  const [alertes, setAlertes] = useState(0);
+  const [recherche, setRecherche] = useState("");
   const [pret, setPret] = useState(false);
   const [form, setForm] = useState<Formulaire | null>(null);
   const [erreur, setErreur] = useState("");
@@ -30,7 +39,13 @@ export default function Dashboard() {
       .from("projets")
       .select("*")
       .order("updated_at", { ascending: false });
-    setProjets(data ?? []);
+    const liste: Projet[] = data ?? [];
+    setProjets(liste);
+    // Alerte = projet "En étude" non modifié depuis plus de 30 jours
+    const limite = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    setAlertes(
+      liste.filter((p) => p.etat === "En étude" && new Date(p.updated_at).getTime() < limite).length
+    );
   }, []);
 
   useEffect(() => {
@@ -82,91 +97,180 @@ export default function Dashboard() {
   if (!pret) return <p className="p-6">Chargement…</p>;
 
   const stats = [
-    { n: projets.length, l: "Projets totaux" },
-    { n: projets.filter((p) => p.etat === "En cours").length, l: "Projets actifs" },
-    { n: projets.filter((p) => p.etat === "Terminé").length, l: "Projets terminés" },
-    { n: 0, l: "Alertes" },
+    { n: projets.length, l: "Projets totaux", icone: "📁", fond: "bg-blue-100" },
+    { n: projets.filter((p) => p.etat === "En cours").length, l: "Projets actifs", icone: "📅", fond: "bg-green-100" },
+    { n: projets.filter((p) => p.etat === "Terminé").length, l: "Projets terminés", icone: "✅", fond: "bg-purple-100" },
+    { n: alertes, l: "Alertes", icone: "⚠️", fond: "bg-red-100" },
   ];
 
+  const projetsAffiches = projets.filter((p) =>
+    p.nom.toLowerCase().includes(recherche.toLowerCase())
+  );
+
+  const parType = TYPES.map((t) => ({ t, n: projets.filter((p) => p.type === t).length }));
+  const maxType = Math.max(1, ...parType.map((x) => x.n));
+
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <aside className="hidden w-56 flex-col bg-slate-900 p-4 text-slate-300 md:flex">
-        <h1 className="mb-6 text-xl font-bold text-white">Ronelbuild</h1>
+    <div className="flex min-h-screen bg-slate-100 text-slate-900">
+      {/* Barre latérale */}
+      <aside className="hidden w-56 flex-col bg-[#0b1b3a] p-4 text-slate-300 md:flex">
+        <div className="mb-8 flex items-center gap-2 px-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 font-bold text-white">
+            R
+          </span>
+          <h1 className="text-lg font-bold text-white">Ronelbuild</h1>
+        </div>
         <nav className="space-y-1">
           {menu.map((m, i) => (
-            <a key={m} href="#" className={`block rounded-md px-3 py-2 text-sm ${i === 0 ? "bg-blue-600 text-white" : "hover:bg-slate-800"}`}>
+            <a
+              key={m}
+              href="#"
+              className={`block rounded-lg px-3 py-2.5 text-sm ${
+                i === 0 ? "bg-blue-600 font-medium text-white" : "hover:bg-white/10"
+              }`}
+            >
               {m}
             </a>
           ))}
         </nav>
-        <button onClick={deconnexion} className="mt-auto rounded-md px-3 py-2 text-left text-sm hover:bg-slate-800">
+        <button
+          onClick={deconnexion}
+          className="mt-auto rounded-lg px-3 py-2.5 text-left text-sm hover:bg-white/10"
+        >
           Se déconnecter
         </button>
       </aside>
 
-      <main className="flex-1 p-6">
-        <h2 className="text-2xl font-bold">Bonjour, {nom} ! 👋</h2>
-        <p className="mb-6 text-slate-500">Voici l’état de vos projets.</p>
-
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.l} className="rounded-xl border bg-white p-4">
-              <p className="text-3xl font-bold">{s.n}</p>
-              <p className="text-sm text-slate-500">{s.l}</p>
+      <div className="flex-1">
+        {/* En-tête */}
+        <header className="flex items-center justify-between gap-4 border-b bg-white px-6 py-3">
+          <input
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher un projet…"
+            className="w-full max-w-md rounded-lg bg-slate-100 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 font-semibold text-white">
+              {(nom[0] ?? "?").toUpperCase()}
+            </span>
+            <div className="hidden text-sm leading-tight sm:block">
+              <p className="font-semibold">{nom}</p>
+              <p className="text-xs text-slate-500">Ingénieur</p>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-6 overflow-x-auto rounded-xl border bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold">Projets récents</h3>
-            <button
-              onClick={() => setForm({ nom: "", type: TYPES[0], etat: ETATS[0] })}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
-              + Nouveau projet
-            </button>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="text-slate-500">
-              <tr>
-                <th className="py-2">Nom du projet</th>
-                <th>Type</th>
-                <th>État</th>
-                <th>Dernière modification</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {projets.map((p) => (
-                <tr key={p.id} className="border-t">
-                  <td className="py-3 font-medium">
-  <Link href={`/projets/${p.id}`} className="text-blue-600 hover:underline">{p.nom}</Link>
-</td>
-                  <td>{p.type}</td>
-                  <td>
-                    <span className={`rounded-full px-2 py-1 text-xs ${couleurs[p.etat] ?? ""}`}>{p.etat}</span>
-                  </td>
-                  <td>{new Date(p.updated_at).toLocaleDateString("fr-FR")}</td>
-                  <td className="space-x-3 text-right">
-                    <button onClick={() => setForm({ id: p.id, nom: p.nom, type: p.type, etat: p.etat })} className="text-blue-600">
-                      Modifier
-                    </button>
-                    <button onClick={() => supprimer(p)} className="text-red-600">
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <GraphiqueEtats projets={projets} />
-          {projets.length === 0 && (
-            <p className="py-6 text-center text-slate-500">Aucun projet. Cliquez sur « Nouveau projet » pour commencer.</p>
-          )}
-        </div>
-      </main>
+        </header>
 
+        <main className="p-6">
+          <h2 className="text-2xl font-bold">Bonjour, {nom} ! 👋</h2>
+          <p className="mb-6 text-slate-500">Voici l’état de vos projets.</p>
+
+          {/* Cartes de chiffres */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.l} className="rounded-xl border bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${s.fond}`}>
+                    {s.icone}
+                  </span>
+                  <p className="text-3xl font-bold">{s.n}</p>
+                </div>
+                <p className="mt-2 text-sm text-slate-500">{s.l}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+            {/* Projets récents */}
+            <div className="overflow-x-auto rounded-xl border bg-white p-4 lg:col-span-2">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-semibold">Projets récents</h3>
+                <button
+                  onClick={() => setForm({ nom: "", type: TYPES[0], etat: ETATS[0] })}
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  + Nouveau projet
+                </button>
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="py-2 font-medium">Nom du projet</th>
+                    <th className="font-medium">Type</th>
+                    <th className="font-medium">État</th>
+                    <th className="font-medium">Dernière modification</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projetsAffiches.map((p) => (
+                    <tr key={p.id} className="border-t">
+                      <td className="py-3 font-medium">
+                        <Link href={`/projets/${p.id}`} className="text-blue-600 hover:underline">
+                          {p.nom}
+                        </Link>
+                      </td>
+                      <td>{p.type}</td>
+                      <td>
+                        <span className={`rounded-full px-2 py-1 text-xs ${couleurs[p.etat] ?? ""}`}>
+                          {p.etat}
+                        </span>
+                      </td>
+                      <td>{new Date(p.updated_at).toLocaleDateString("fr-FR")}</td>
+                      <td className="space-x-3 whitespace-nowrap text-right">
+                        <button
+                          onClick={() => setForm({ id: p.id, nom: p.nom, type: p.type, etat: p.etat })}
+                          className="text-blue-600"
+                        >
+                          Modifier
+                        </button>
+                        <button onClick={() => supprimer(p)} className="text-red-600">
+                          Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {projetsAffiches.length === 0 && (
+                <p className="py-6 text-center text-slate-500">
+                  {projets.length === 0
+                    ? "Aucun projet. Cliquez sur « Nouveau projet » pour commencer."
+                    : "Aucun projet ne correspond à votre recherche."}
+                </p>
+              )}
+            </div>
+
+            {/* Colonne de droite */}
+            <div className="space-y-6">
+              <div className="rounded-xl border bg-white p-4">
+                <h3 className="mb-2 font-semibold">État global des projets</h3>
+                <GraphiqueEtats projets={projets} />
+              </div>
+
+              <div className="rounded-xl border bg-white p-4">
+                <h3 className="mb-4 font-semibold">Répartition par type</h3>
+                <div className="space-y-3">
+                  {parType.map(({ t, n }) => (
+                    <div key={t} className="flex items-center gap-3 text-sm">
+                      <span className="w-24 text-slate-600">{t}</span>
+                      <div className="h-3 flex-1 rounded-full bg-slate-100">
+                        <div
+                          className={`h-3 rounded-full ${couleursTypes[t] ?? "bg-slate-400"}`}
+                          style={{ width: `${(n / maxType) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-4 text-right font-medium">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Fenêtre Nouveau / Modifier */}
       {form && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
           <form onSubmit={enregistrer} className="w-full max-w-md space-y-4 rounded-xl bg-white p-6">
@@ -211,10 +315,17 @@ export default function Dashboard() {
             {erreur && <p className="text-sm text-red-600">{erreur}</p>}
 
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={() => setForm(null)} className="rounded-md px-4 py-2 text-slate-600 hover:bg-slate-100">
+              <button
+                type="button"
+                onClick={() => setForm(null)}
+                className="rounded-md px-4 py-2 text-slate-600 hover:bg-slate-100"
+              >
                 Annuler
               </button>
-              <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
+              <button
+                type="submit"
+                className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+              >
                 Enregistrer
               </button>
             </div>
