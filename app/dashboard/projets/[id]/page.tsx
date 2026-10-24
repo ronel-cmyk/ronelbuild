@@ -4,6 +4,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../../lib/supabase";
 import Geotechnique from "../../../../components/Geotechnique";
+import EtatTravaux from "../../../components/EtatTravaux";
+import RepartitionCouts from "../../../components/RepartitionCouts";
 
 type Projet = {
   id: string;
@@ -31,7 +33,6 @@ type Edition = {
   date_fin: string;
   budget: string;
   cout_estime: string;
-  avancement: string;
   maitre_ouvrage: string;
   responsable: string;
   description: string;
@@ -131,7 +132,6 @@ export default function FicheProjet() {
       date_fin: projet.date_fin ?? "",
       budget: projet.budget?.toString() ?? "",
       cout_estime: projet.cout_estime?.toString() ?? "",
-      avancement: String(projet.avancement ?? 0),
       maitre_ouvrage: projet.maitre_ouvrage ?? "",
       responsable: projet.responsable ?? "",
       description: projet.description ?? "",
@@ -145,9 +145,8 @@ export default function FicheProjet() {
     const nombre = (v: string) => (v.trim() === "" ? null : parseFloat(v.replace(/\s/g, "").replace(",", ".")));
     const budget = nombre(edition.budget);
     const cout = nombre(edition.cout_estime);
-    const avancement = nombre(edition.avancement) ?? 0;
-    if ([budget, cout, avancement].some((v) => v !== null && isNaN(v))) {
-      return setErreurEdition("Budget, coût et avancement doivent être des nombres.");
+    if ([budget, cout].some((v) => v !== null && isNaN(v))) {
+      return setErreurEdition("Budget et coût doivent être des nombres.");
     }
     if (edition.date_debut && edition.date_fin && edition.date_fin < edition.date_debut) {
       return setErreurEdition("La date de fin doit être après la date de début.");
@@ -163,7 +162,6 @@ export default function FicheProjet() {
         date_fin: edition.date_fin || null,
         budget,
         cout_estime: cout,
-        avancement: Math.min(100, Math.max(0, Math.round(avancement))),
         maitre_ouvrage: edition.maitre_ouvrage || null,
         responsable: edition.responsable || null,
         description: edition.description || null,
@@ -274,6 +272,7 @@ export default function FicheProjet() {
               <p className="text-sm text-slate-500">Avancement global</p>
               <p className="text-2xl font-bold">{projet.avancement}%</p>
               {barre(projet.avancement, "bg-green-500")}
+              <p className="mt-1 text-xs text-slate-400">Calculé d’après l’état des travaux</p>
             </div>
             <div className="rounded-xl border bg-white p-4">
               <p className="text-sm text-slate-500">Durée du projet</p>
@@ -309,6 +308,14 @@ export default function FicheProjet() {
               <p className="text-slate-500">Description</p>
               <p className="whitespace-pre-line">{projet.description || "—"}</p>
             </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <RepartitionCouts projetId={id} />
+            <EtatTravaux
+              projetId={id}
+              onAvancement={(n) => setProjet((p) => (p ? { ...p, avancement: n } : p))}
+            />
           </div>
         </div>
       )}
@@ -414,13 +421,10 @@ export default function FicheProjet() {
               <label className="block text-sm font-medium">Coût estimé (FCFA)
                 <input inputMode="decimal" value={edition.cout_estime} onChange={(e) => setEdition({ ...edition, cout_estime: e.target.value })} className={champ} />
               </label>
-              <label className="block text-sm font-medium">Avancement (0 à 100 %)
-                <input inputMode="numeric" value={edition.avancement} onChange={(e) => setEdition({ ...edition, avancement: e.target.value })} className={champ} />
-              </label>
               <label className="block text-sm font-medium">Maître d’ouvrage
                 <input value={edition.maitre_ouvrage} onChange={(e) => setEdition({ ...edition, maitre_ouvrage: e.target.value })} className={champ} />
               </label>
-              <label className="block text-sm font-medium sm:col-span-2">Responsable
+              <label className="block text-sm font-medium">Responsable
                 <input value={edition.responsable} onChange={(e) => setEdition({ ...edition, responsable: e.target.value })} className={champ} />
               </label>
               <label className="block text-sm font-medium sm:col-span-2">Description
