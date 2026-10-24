@@ -151,7 +151,7 @@ export default function Dashboard() {
                 {projetsAffiches.map((p) => (
                   <tr key={p.id} className="border-t">
                     <td className="py-3 font-medium">
-                      <Link href={`dashboarddashboard/projets/${p.id}`} className="text-blue-600 hover:underline">
+                      <Link href={`dashboard/projets/${p.id}`} className="text-blue-600 hover:underline">
                         {p.nom}
                       </Link>
                     </td>

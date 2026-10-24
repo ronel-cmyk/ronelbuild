@@ -5,9 +5,37 @@ import Link from "next/link";
 import { supabase } from "../../../../lib/supabase";
 import Geotechnique from "../../../../components/Geotechnique";
 
-type Projet = { id: string; nom: string; type: string; etat: string; updated_at: string };
+type Projet = {
+  id: string;
+  nom: string;
+  type: string;
+  etat: string;
+  updated_at: string;
+  lieu: string | null;
+  date_debut: string | null;
+  date_fin: string | null;
+  budget: number | null;
+  cout_estime: number | null;
+  avancement: number;
+  maitre_ouvrage: string | null;
+  responsable: string | null;
+  description: string | null;
+};
 type Point = { id: string; nom: string; x: number; y: number; z: number; notes: string | null };
-type Edition = { nom: string; type: string; etat: string };
+type Edition = {
+  nom: string;
+  type: string;
+  etat: string;
+  lieu: string;
+  date_debut: string;
+  date_fin: string;
+  budget: string;
+  cout_estime: string;
+  avancement: string;
+  maitre_ouvrage: string;
+  responsable: string;
+  description: string;
+};
 
 const ONGLETS = [
   "Vue d'ensemble",
@@ -22,10 +50,18 @@ const ONGLETS = [
 ];
 const TYPES = ["Bâtiment", "Route", "Pont", "Hydraulique", "Autre"];
 const ETATS = ["En étude", "En cours", "Terminé"];
+const COLONNES =
+  "id, nom, type, etat, updated_at, lieu, date_debut, date_fin, budget, cout_estime, avancement, maitre_ouvrage, responsable, description";
+
+const jour = (d: string) => new Date(d + "T00:00:00");
+const formatDate = (d: string | null) =>
+  d ? jour(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const fcfa = (n: number | null) => (n === null || n === undefined ? "—" : `${n.toLocaleString("fr-FR")} FCFA`);
 
 export default function FicheProjet() {
   const { id } = useParams<{ id: string }>();
   const [projet, setProjet] = useState<Projet | null>(null);
+  const [joursRestants, setJoursRestants] = useState<number | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
   const [pret, setPret] = useState(false);
   const [onglet, setOnglet] = useState("Vue d'ensemble");
@@ -35,12 +71,14 @@ export default function FicheProjet() {
   const [erreurEdition, setErreurEdition] = useState("");
 
   const chargerProjet = useCallback(async () => {
-    const { data: p } = await supabase
-      .from("projets")
-      .select("id, nom, type, etat, updated_at")
-      .eq("id", id)
-      .single();
+    const { data: p } = await supabase.from("projets").select(COLONNES).eq("id", id).single();
     setProjet(p);
+    if (p?.date_fin) {
+      const diff = jour(p.date_fin).getTime() - Date.now();
+      setJoursRestants(Math.max(0, Math.ceil(diff / 86400000)));
+    } else {
+      setJoursRestants(null);
+    }
   }, [id]);
 
   const chargerPoints = useCallback(async () => {
@@ -81,13 +119,56 @@ export default function FicheProjet() {
     await chargerPoints();
   }
 
+  function ouvrirEdition() {
+    if (!projet) return;
+    setErreurEdition("");
+    setEdition({
+      nom: projet.nom,
+      type: projet.type,
+      etat: projet.etat,
+      lieu: projet.lieu ?? "",
+      date_debut: projet.date_debut ?? "",
+      date_fin: projet.date_fin ?? "",
+      budget: projet.budget?.toString() ?? "",
+      cout_estime: projet.cout_estime?.toString() ?? "",
+      avancement: String(projet.avancement ?? 0),
+      maitre_ouvrage: projet.maitre_ouvrage ?? "",
+      responsable: projet.responsable ?? "",
+      description: projet.description ?? "",
+    });
+  }
+
   async function enregistrerEdition(e: React.FormEvent) {
     e.preventDefault();
     if (!edition) return;
     setErreurEdition("");
+    const nombre = (v: string) => (v.trim() === "" ? null : parseFloat(v.replace(/\s/g, "").replace(",", ".")));
+    const budget = nombre(edition.budget);
+    const cout = nombre(edition.cout_estime);
+    const avancement = nombre(edition.avancement) ?? 0;
+    if ([budget, cout, avancement].some((v) => v !== null && isNaN(v))) {
+      return setErreurEdition("Budget, coût et avancement doivent être des nombres.");
+    }
+    if (edition.date_debut && edition.date_fin && edition.date_fin < edition.date_debut) {
+      return setErreurEdition("La date de fin doit être après la date de début.");
+    }
     const { error } = await supabase
       .from("projets")
-      .update({ ...edition, updated_at: new Date().toISOString() })
+      .update({
+        nom: edition.nom,
+        type: edition.type,
+        etat: edition.etat,
+        lieu: edition.lieu || null,
+        date_debut: edition.date_debut || null,
+        date_fin: edition.date_fin || null,
+        budget,
+        cout_estime: cout,
+        avancement: Math.min(100, Math.max(0, Math.round(avancement))),
+        maitre_ouvrage: edition.maitre_ouvrage || null,
+        responsable: edition.responsable || null,
+        description: edition.description || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id);
     if (error) return setErreurEdition(error.message);
     setEdition(null);
@@ -103,11 +184,32 @@ export default function FicheProjet() {
   const denivele = zmin !== null && zmax !== null ? (zmax - zmin).toFixed(2) : "—";
   const champ = "mt-1 w-full rounded-md border border-slate-300 px-3 py-2";
   const dateModif = new Date(projet.updated_at).toLocaleDateString("fr-FR");
+  const duree =
+    projet.date_debut && projet.date_fin
+      ? Math.round((jour(projet.date_fin).getTime() - jour(projet.date_debut).getTime()) / 86400000)
+      : null;
+  const pctBudget =
+    projet.budget && projet.cout_estime !== null
+      ? Math.min(100, Math.round((projet.cout_estime / projet.budget) * 100))
+      : null;
+
+  const barre = (pct: number, couleur: string) => (
+    <div className="mt-2 h-2 rounded-full bg-slate-100">
+      <div className={`h-2 rounded-full ${couleur}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
 
   const carte = (valeur: string | number, libelle: string) => (
     <div className="rounded-xl border bg-white p-4">
       <p className="text-2xl font-bold">{valeur}</p>
       <p className="text-sm text-slate-500">{libelle}</p>
+    </div>
+  );
+
+  const info = (libelle: string, valeur: string | null) => (
+    <div>
+      <dt className="text-slate-500">{libelle}</dt>
+      <dd className="font-medium">{valeur || "—"}</dd>
     </div>
   );
 
@@ -121,7 +223,7 @@ export default function FicheProjet() {
           <span className="font-medium text-slate-900">{projet.nom}</span>
         </p>
         <button
-          onClick={() => setEdition({ nom: projet.nom, type: projet.type, etat: projet.etat })}
+          onClick={ouvrirEdition}
           className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
         >
           Modifier
@@ -129,12 +231,25 @@ export default function FicheProjet() {
       </div>
 
       {/* Bandeau */}
-      <div className="mb-4 rounded-xl bg-[#0b1b3a] p-6 text-white">
-        <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">{projet.etat}</span>
-        <h1 className="mt-3 text-3xl font-bold">{projet.nom}</h1>
-        <p className="mt-1 text-sm text-slate-300">
-          {projet.type} · Dernière modification le {dateModif}
-        </p>
+      <div className="mb-4 flex flex-col justify-between gap-4 rounded-xl bg-[#0b1b3a] p-6 text-white lg:flex-row lg:items-end">
+        <div>
+          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">{projet.etat}</span>
+          <h1 className="mt-3 text-3xl font-bold">{projet.nom}</h1>
+          <p className="mt-2 text-sm text-slate-300">{projet.lieu || "Lieu non renseigné"}</p>
+          <p className="text-sm text-slate-300">
+            {projet.date_debut && projet.date_fin
+              ? `${formatDate(projet.date_debut)} – ${formatDate(projet.date_fin)}`
+              : "Dates non renseignées"}
+          </p>
+          <p className="mt-1 text-xs text-slate-400">{projet.type} · modifié le {dateModif}</p>
+        </div>
+        <div className="w-full rounded-xl bg-white p-4 text-slate-900 lg:w-72">
+          <div className="flex justify-between text-sm">
+            <span className="font-medium">Avancement global</span>
+            <span className="font-semibold">{projet.avancement}%</span>
+          </div>
+          {barre(projet.avancement, "bg-green-500")}
+        </div>
       </div>
 
       {/* Onglets */}
@@ -155,20 +270,45 @@ export default function FicheProjet() {
       {onglet === "Vue d'ensemble" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="rounded-xl border bg-white p-4">
+              <p className="text-sm text-slate-500">Avancement global</p>
+              <p className="text-2xl font-bold">{projet.avancement}%</p>
+              {barre(projet.avancement, "bg-green-500")}
+            </div>
+            <div className="rounded-xl border bg-white p-4">
+              <p className="text-sm text-slate-500">Durée du projet</p>
+              <p className="text-2xl font-bold">{duree !== null ? `${duree} jours` : "—"}</p>
+              <p className="mt-1 text-xs text-blue-600">
+                {joursRestants !== null ? `Jours restants : ${joursRestants}` : "Dates à renseigner"}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-white p-4">
+              <p className="text-sm text-slate-500">Coût estimé</p>
+              <p className="text-lg font-bold leading-8">{fcfa(projet.cout_estime)}</p>
+              <p className="text-xs text-slate-500">
+                Budget : {fcfa(projet.budget)}
+                {pctBudget !== null && ` · ${pctBudget}%`}
+              </p>
+              {pctBudget !== null && barre(pctBudget, pctBudget > 100 ? "bg-red-500" : "bg-blue-500")}
+            </div>
             {carte(points.length, "Points topographiques")}
-            {carte(projet.type, "Type d’ouvrage")}
-            {carte(projet.etat, "État")}
-            {carte(dateModif, "Dernière modification")}
           </div>
 
           <div className="rounded-xl border bg-white p-4">
             <h3 className="mb-3 font-semibold">Informations du projet</h3>
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <div><dt className="text-slate-500">Nom</dt><dd className="font-medium">{projet.nom}</dd></div>
-              <div><dt className="text-slate-500">Type d’ouvrage</dt><dd className="font-medium">{projet.type}</dd></div>
-              <div><dt className="text-slate-500">État</dt><dd className="font-medium">{projet.etat}</dd></div>
-              <div><dt className="text-slate-500">Dénivelé relevé</dt><dd className="font-medium">{denivele === "—" ? "—" : `${denivele} m`}</dd></div>
+            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              {info("Type d’ouvrage", projet.type)}
+              {info("État", projet.etat)}
+              {info("Lieu", projet.lieu)}
+              {info("Maître d’ouvrage", projet.maitre_ouvrage)}
+              {info("Responsable", projet.responsable)}
+              {info("Budget prévisionnel", projet.budget !== null ? fcfa(projet.budget) : null)}
+              {info("Dénivelé relevé", denivele === "—" ? null : `${denivele} m`)}
             </dl>
+            <div className="mt-4 text-sm">
+              <p className="text-slate-500">Description</p>
+              <p className="whitespace-pre-line">{projet.description || "—"}</p>
+            </div>
           </div>
         </div>
       )}
@@ -238,22 +378,56 @@ export default function FicheProjet() {
 
       {/* Fenêtre Modifier */}
       {edition && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={enregistrerEdition} className="w-full max-w-md space-y-4 rounded-xl bg-white p-6">
+        <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
+          <form
+            onSubmit={enregistrerEdition}
+            className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-xl bg-white p-6"
+          >
             <h3 className="text-xl font-bold">Modifier le projet</h3>
-            <label className="block text-sm font-medium">Nom du projet
-              <input required value={edition.nom} onChange={(e) => setEdition({ ...edition, nom: e.target.value })} className={champ} />
-            </label>
-            <label className="block text-sm font-medium">Type
-              <select value={edition.type} onChange={(e) => setEdition({ ...edition, type: e.target.value })} className={champ}>
-                {TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm font-medium">État
-              <select value={edition.etat} onChange={(e) => setEdition({ ...edition, etat: e.target.value })} className={champ}>
-                {ETATS.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </label>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium sm:col-span-2">Nom du projet
+                <input required value={edition.nom} onChange={(e) => setEdition({ ...edition, nom: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Type
+                <select value={edition.type} onChange={(e) => setEdition({ ...edition, type: e.target.value })} className={champ}>
+                  {TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-medium">État
+                <select value={edition.etat} onChange={(e) => setEdition({ ...edition, etat: e.target.value })} className={champ}>
+                  {ETATS.map((t) => <option key={t}>{t}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-medium sm:col-span-2">Lieu
+                <input placeholder="Yaoundé, Cameroun" value={edition.lieu} onChange={(e) => setEdition({ ...edition, lieu: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Date de début
+                <input type="date" value={edition.date_debut} onChange={(e) => setEdition({ ...edition, date_debut: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Date de fin
+                <input type="date" value={edition.date_fin} onChange={(e) => setEdition({ ...edition, date_fin: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Budget prévisionnel (FCFA)
+                <input inputMode="decimal" value={edition.budget} onChange={(e) => setEdition({ ...edition, budget: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Coût estimé (FCFA)
+                <input inputMode="decimal" value={edition.cout_estime} onChange={(e) => setEdition({ ...edition, cout_estime: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Avancement (0 à 100 %)
+                <input inputMode="numeric" value={edition.avancement} onChange={(e) => setEdition({ ...edition, avancement: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium">Maître d’ouvrage
+                <input value={edition.maitre_ouvrage} onChange={(e) => setEdition({ ...edition, maitre_ouvrage: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium sm:col-span-2">Responsable
+                <input value={edition.responsable} onChange={(e) => setEdition({ ...edition, responsable: e.target.value })} className={champ} />
+              </label>
+              <label className="block text-sm font-medium sm:col-span-2">Description
+                <textarea rows={3} value={edition.description} onChange={(e) => setEdition({ ...edition, description: e.target.value })} className={champ} />
+              </label>
+            </div>
+
             {erreurEdition && <p className="text-sm text-red-600">{erreurEdition}</p>}
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setEdition(null)} className="rounded-md px-4 py-2 text-slate-600 hover:bg-slate-100">Annuler</button>
