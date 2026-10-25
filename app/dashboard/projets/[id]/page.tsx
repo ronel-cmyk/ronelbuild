@@ -6,6 +6,7 @@ import { supabase } from "../../../../lib/supabase";
 import Geotechnique from "../../../../components/Geotechnique";
 import EtatTravaux from "../../../components/EtatTravaux";
 import RepartitionCouts from "../../../components/RepartitionCouts";
+import EquipeProjet from "../../../components/EquipeProjet";
 
 type Projet = {
   id: string;
@@ -63,6 +64,7 @@ export default function FicheProjet() {
   const { id } = useParams<{ id: string }>();
   const [projet, setProjet] = useState<Projet | null>(null);
   const [joursRestants, setJoursRestants] = useState<number | null>(null);
+  const [nbEquipe, setNbEquipe] = useState<number | null>(null);
   const [points, setPoints] = useState<Point[]>([]);
   const [pret, setPret] = useState(false);
   const [onglet, setOnglet] = useState("Vue d'ensemble");
@@ -239,6 +241,11 @@ export default function FicheProjet() {
               ? `${formatDate(projet.date_debut)} – ${formatDate(projet.date_fin)}`
               : "Dates non renseignées"}
           </p>
+          {nbEquipe !== null && (
+            <p className="text-sm text-slate-300">
+              Équipe : {nbEquipe} membre{nbEquipe > 1 ? "s" : ""}
+            </p>
+          )}
           <p className="mt-1 text-xs text-slate-400">{projet.type} · modifié le {dateModif}</p>
         </div>
         <div className="w-full rounded-xl bg-white p-4 text-slate-900 lg:w-72">
@@ -317,6 +324,8 @@ export default function FicheProjet() {
               onAvancement={(n) => setProjet((p) => (p ? { ...p, avancement: n } : p))}
             />
           </div>
+
+          <EquipeProjet projetId={id} onNombre={setNbEquipe} />
         </div>
       )}
 
