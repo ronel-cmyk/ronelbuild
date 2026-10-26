@@ -5,8 +5,10 @@ import Link from "next/link";
 import { supabase } from "../../../../lib/supabase";
 import Geotechnique from "../../../../components/Geotechnique";
 import EtatTravaux from "../../../components/EtatTravaux";
-import RepartitionCouts from "../../../components/RepartitionCouts";
 import EquipeProjet from "../../../components/EquipeProjet";
+import EvolutionProjet from "../../../components/EvolutionProjet";
+import MateriauxProjet from "../../../components/MateriauxProjet";
+import StructureProjet from "../../../components/StructureProjet";
 
 type Projet = {
   id: string;
@@ -43,12 +45,9 @@ const ONGLETS = [
   "Vue d'ensemble",
   "Topographie",
   "Géotechnique",
-  "Hydrologique",
   "Matériaux",
   "Structure",
-  "Documents",
   "Rapports",
-  "Paramètres",
 ];
 const TYPES = ["Bâtiment", "Route", "Pont", "Hydraulique", "Autre"];
 const ETATS = ["En étude", "En cours", "Terminé"];
@@ -192,6 +191,11 @@ export default function FicheProjet() {
     projet.budget && projet.cout_estime !== null
       ? Math.min(100, Math.round((projet.cout_estime / projet.budget) * 100))
       : null;
+  // Délai consommé : part de la durée déjà écoulée (0 à 100 %)
+  const delaiPct =
+    duree && joursRestants !== null
+      ? Math.min(100, Math.max(0, Math.round(((duree - joursRestants) / duree) * 100)))
+      : null;
 
   const barre = (pct: number, couleur: string) => (
     <div className="mt-2 h-2 rounded-full bg-slate-100">
@@ -317,15 +321,20 @@ export default function FicheProjet() {
             </div>
           </div>
 
+          <EvolutionProjet
+            projetId={id}
+            avancement={projet.avancement}
+            coutPct={pctBudget}
+            delaiPct={delaiPct}
+          />
+
           <div className="grid gap-6 lg:grid-cols-2">
-            <RepartitionCouts projetId={id} />
             <EtatTravaux
               projetId={id}
               onAvancement={(n) => setProjet((p) => (p ? { ...p, avancement: n } : p))}
             />
+            <EquipeProjet projetId={id} onNombre={setNbEquipe} />
           </div>
-
-          <EquipeProjet projetId={id} onNombre={setNbEquipe} />
         </div>
       )}
 
@@ -385,7 +394,11 @@ export default function FicheProjet() {
         </div>
       )}
 
-      {["Hydrologique", "Matériaux", "Structure", "Documents", "Rapports", "Paramètres"].includes(onglet) && (
+      {onglet === "Matériaux" && <MateriauxProjet projetId={id} budget={projet.budget} />}
+
+      {onglet === "Structure" && <StructureProjet projetId={id} />}
+
+      {onglet === "Rapports" && (
         <div className="rounded-xl border bg-white p-6">
           <h3 className="font-semibold">{onglet}</h3>
           <p className="mt-1 text-sm text-slate-500">Cette section arrive bientôt.</p>

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { supabase } from "../../../../lib/supabase";
 import Geotechnique from "../../../../components/Geotechnique";
 import EtatTravaux from "../../../components/EtatTravaux";
-import RepartitionCouts from "../../../components/RepartitionCouts";
 import EquipeProjet from "../../../components/EquipeProjet";
 import EvolutionProjet from "../../../components/EvolutionProjet";
+import MateriauxProjet from "../../../components/MateriauxProjet";
+import StructureProjet from "../../../components/StructureProjet";
 
 type Projet = {
   id: string;
@@ -331,14 +332,12 @@ export default function FicheProjet() {
           />
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <RepartitionCouts projetId={id} />
             <EtatTravaux
               projetId={id}
               onAvancement={(n) => setProjet((p) => (p ? { ...p, avancement: n } : p))}
             />
+            <EquipeProjet projetId={id} onNombre={setNbEquipe} />
           </div>
-
-          <EquipeProjet projetId={id} onNombre={setNbEquipe} />
         </div>
       )}
 
@@ -398,7 +397,11 @@ export default function FicheProjet() {
         </div>
       )}
 
-      {["Hydrologique", "Matériaux", "Structure", "Documents", "Rapports", "Paramètres"].includes(onglet) && (
+      {onglet === "Matériaux" && <MateriauxProjet projetId={id} budget={projet.budget} />}
+
+      {onglet === "Structure" && <StructureProjet projetId={id} />}
+
+      {["Hydrologique", "Documents", "Rapports", "Paramètres"].includes(onglet) && (
         <div className="rounded-xl border bg-white p-6">
           <h3 className="font-semibold">{onglet}</h3>
           <p className="mt-1 text-sm text-slate-500">Cette section arrive bientôt.</p>
