@@ -9,6 +9,7 @@ import EquipeProjet from "../../../components/EquipeProjet";
 import EvolutionProjet from "../../../components/EvolutionProjet";
 import MateriauxProjet from "../../../components/MateriauxProjet";
 import StructureProjet from "../../../components/StructureProjet";
+import RapportsProjet from "../../../components/RapportsProjet";
 
 type Projet = {
   id: string;
@@ -398,12 +399,7 @@ export default function FicheProjet() {
 
       {onglet === "Structure" && <StructureProjet projetId={id} />}
 
-      {onglet === "Rapports" && (
-        <div className="rounded-xl border bg-white p-6">
-          <h3 className="font-semibold">{onglet}</h3>
-          <p className="mt-1 text-sm text-slate-500">Cette section arrive bientôt.</p>
-        </div>
-      )}
+      {onglet === "Rapports" && <RapportsProjet projetId={id} projet={projet} joursRestants={joursRestants} />}
 
       {/* Fenêtre Modifier */}
       {edition && (
