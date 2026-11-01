@@ -8,9 +8,8 @@ const menu = [
   { label: "Dashboard", href: "/dashboard" },
   { label: "Projets", href: "/dashboard/projets" },
   { label: "Analyses", href: "/dashboard/analyses" },
-  { label: "Données", href: "/dashboard/donnees" },
   { label: "Rapports", href: "/dashboard/rapports" },
-  { label: "Documents", href: "/dashboard/documents" },
+  { label: "Paramètres", href: "/dashboard/parametres" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
