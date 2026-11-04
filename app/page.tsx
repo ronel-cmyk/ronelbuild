@@ -1,18 +1,50 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [envoi, setEnvoi] = useState(false);
 
-  const handleLogin = (e: FormEvent<HTMLFormElement>) => {
+  // Si la personne est déjà connectée, on l'envoie directement sur le tableau de bord
+  useEffect(() => {
+    async function verifier() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) router.replace("/dashboard");
+    }
+    verifier();
+  }, [router]);
+
+  const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setErreur("");
+    setEnvoi(true);
 
-    // L'authentification Supabase sera conservée ici
-    // et devra être reliée à ton système existant.
-    console.log("Tentative de connexion pour :", email);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    setEnvoi(false);
+
+    if (error) {
+      if (error.message.includes("Invalid login credentials")) {
+        return setErreur("Adresse e-mail ou mot de passe incorrect.");
+      }
+      if (error.message.includes("Email not confirmed")) {
+        return setErreur("Adresse e-mail non confirmée. Ouvrez le message reçu pour la confirmer.");
+      }
+      return setErreur(error.message);
+    }
+
+    router.replace("/dashboard");
   };
 
   return (
@@ -197,8 +229,7 @@ export default function Home() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mot de passe (8 caractères minimum)"
-                minLength={8}
+                placeholder="Mot de passe"
                 required
                 className="h-[58px] w-full rounded-xl border border-slate-300 bg-white pl-14 pr-14 text-sm text-slate-800 shadow-sm outline-none transition-all placeholder:text-slate-500 hover:border-blue-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
               />
@@ -213,10 +244,18 @@ export default function Home() {
               </button>
             </div>
 
+            {/* MESSAGE D'ERREUR */}
+            {erreur && (
+              <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
+                {erreur}
+              </p>
+            )}
+
             {/* BOUTON */}
             <button
               type="submit"
-              className="flex h-[62px] w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-[#087cf5] to-[#064cc2] text-base font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-600/30 active:translate-y-0"
+              disabled={envoi}
+              className="flex h-[62px] w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-[#087cf5] to-[#064cc2] text-base font-bold text-white shadow-lg shadow-blue-600/20 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-600/30 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -234,23 +273,17 @@ export default function Home() {
                 <path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6" />
               </svg>
 
-              Se connecter
+              {envoi ? "Connexion…" : "Se connecter"}
             </button>
 
           </form>
 
           {/* INSCRIPTION */}
           <div className="mt-7 text-center text-sm text-slate-600">
-            Vous n'avez pas de compte ?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                alert("Page de création de compte à venir.");
-              }}
-              className="font-bold text-blue-700 transition hover:text-blue-900"
-            >
+            Vous n’avez pas de compte ?{" "}
+            <Link href="/inscription" className="font-bold text-blue-700 transition hover:text-blue-900">
               Créer un compte →
-            </button>
+            </Link>
           </div>
 
           {/* SECURITE */}
