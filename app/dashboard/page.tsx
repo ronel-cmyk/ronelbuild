@@ -151,7 +151,7 @@ export default function Dashboard() {
                 {projetsAffiches.map((p) => (
                   <tr key={p.id} className="border-t">
                     <td className="py-3 font-medium">
-                      <Link href={`dashboard/projets/${p.id}`} className="text-blue-600 hover:underline">
+                      <Link href={`/dashboard/projets/${p.id}`} className="text-blue-600 hover:underline">
                         {p.nom}
                       </Link>
                     </td>
@@ -163,6 +163,12 @@ export default function Dashboard() {
                     </td>
                     <td>{new Date(p.updated_at).toLocaleDateString("fr-FR")}</td>
                     <td className="space-x-3 whitespace-nowrap text-right">
+                      <Link
+                        href={`/dashboard/projets/${p.id}`}
+                        className="inline-block rounded-md bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                      >
+                        Détails
+                      </Link>
                       <button
                         onClick={() => setForm({ id: p.id, nom: p.nom, type: p.type, etat: p.etat })}
                         className="text-blue-600"
